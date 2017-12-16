@@ -150,6 +150,14 @@ func TestFrame(test Test) {
 		AlertSys(true, "Error setting port", time.Now())
 		return
 	}
+	if Mset.Settings.Connections == 0 {
+		 Mset.Settings.Connections = 100
+	}
+
+	if Mset.Settings.Threads == 0 {
+		 Mset.Settings.Threads = 2
+	}
+
 	TestCount++
 	addr := fmt.Sprintf("http://127.0.0.1:%s", port)
 	cmmand := fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v http://127.0.0.1:%s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, port, test.Path)
