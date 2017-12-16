@@ -138,10 +138,10 @@ func TestFrame(test Test) {
 
 	port := fmt.Sprintf("%v", TestCount+45000)
 	err = os.Setenv("PORT", port)
-
-	for i := 0; i < len(app.Envs); i++ {
-
-		os.Setenv(app.Envs[i].Key, app.Envs[i].Value)
+	if app.Envs != nil {
+		for i := 0; i < len(app.Envs); i++ {
+			os.Setenv(app.Envs[i].Key, app.Envs[i].Value)
+		}
 	}
 	if err != nil {
 		test.Working = false
