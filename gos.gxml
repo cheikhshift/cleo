@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gos>
+	<!-- xml docs : http://golangserver.com/docs/markup.html
+	<func name="" var="" return="string">
+		
+		</func> -->
+	<deploy>webapp</deploy>
+	<port>9000</port>
+	<package>if-package-is-library</package>
+	<not_found>/your-404-page</not_found>
+	<error>/your-500-page</error>
+	<import src="github.com/cheikhshift/momentum/gos.gxml"/>
+	<import src="os"/>
+	<import src="strings"/>
+	<import src="runtime"/>
+	<import src="github.com/cheikhshift/gos/core"/>
+	<import src="path/filepath"/>
+	<import src="strconv"/>
+	<output>application.go</output>
+	<domain></domain><!-- Cookie domain -->
+	<var type="*CleoSet">Mset</var>
+	<main>	
+	//psss go code here : func main()
+		Windows := strings.Contains(runtime.GOOS, "windows") 
+		if  Windows {
+				os.Chdir( os.ExpandEnv("$USERPROFILE") )
+		} else {
+				os.Chdir( os.ExpandEnv("$HOME") )
+		}
+
+		
+
+		if  _, err := os.Stat(cleoWorkspace); os.IsNotExist(err) {
+			err = os.MkdirAll(cleoWorkspace, 0700)
+			if err != nil {
+				panic(err)
+			}
+			Mset = &CleoSet{}
+			SaveConfig()
+		} else {
+			err = Load( Path("configs", "default", "000") , &Mset)
+			if err != nil {
+				panic(err)
+			}
+
+		}
+
+		//TestFrame(Mset.Tests[0])
+
+		if Prod {
+			if  !Windows {
+	      		if isMac := strings.Contains(runtime.GOOS, "arwin"); isMac { 
+	      			core.RunCmd("open http://localhost:9000/index")
+	      		} else {
+	      			core.RunCmd("xdg-open http://localhost:9000/index")
+	      		}
+	    	} else {
+				core.RunCmd("cmd /C start http://localhost:9000/index")
+	    	}
+    	} 
+	</main>
+
+
+	<key>a very very very very secret key</key>
+	
+	<header> 
+	<struct name="App">
+	 	Name,Path,ID string
+	 	FetchOntest bool
+	 	Envs 	[]EnvVar
+	</struct>
+	<struct name="Setting">
+	 	SMTPEmail, SMTPHost,SMTPPass,Emails  string
+	 	EmailOnAlert bool
+	 	SMTPPort,Threads,Connections int
+	</struct>
+	<struct name="EnvVar">
+	 	Key,Value string
+	</struct>
+	<struct name="Test">
+	 	ID,TargetID string
+	 	Name,Data,Path,Method,H string
+	 	NReqs int
+	 	Finished,Working bool
+	 	Duration float64
+	 	HeapMinute []HeapFrame
+	 	Start,End time.Time
+	</struct>
+	<struct name="HeapFrame">
+		Iu, Rl,Ho int 
+		Time time.Time 
+	</struct>
+	<struct name="CleoSet">
+	 	Apps []App
+	 	Settings Setting
+	 	Tests []Test
+	 	Alerts []Alert
+	</struct>
+	<struct name="Alert">
+	 	Danger bool
+	 	Message string
+	 	Time time.Time
+	</struct>
+	<struct name="TopDist">
+	 	Name string
+	 	Percent float64
+	</struct>
+	</header>
+	<methods>
+		<func name="AddApp" var="app App" return="(done bool)">
+			app.ID = core.NewLen(10)
+			Mset.Apps = append(Mset.Apps, app)
+			SaveConfig()
+			done = true
+			return
+		</func>
+
+		<func name="AddTest" var="test Test" return="(done bool)">
+			test.ID = core.NewLen(10)
+			Mset.Tests = append(Mset.Tests, test)
+			SaveConfig()
+			done = true
+			return
+		</func>
+
+		<func name="Cleo" var="" return="(cleo *CleoSet)">
+			cleo = Mset
+			return
+		</func>
+		<func name="DeleteAlerts" var="" return="(done bool)">
+			Mset.Alerts = []Alert{}
+			SaveConfig()
+			return
+		</func>
+  		<func name="GetList" var="test Test, lookup string" return="(list string)">
+			
+			for cnt, _ := range test.HeapMinute {
+				cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt ) )) )
+				logfull,_ := core.RunCmdSmart(cmd )
+				
+				retset := strings.Split(logfull,"\n")
+				
+				if len(retset) > 2 {
+					list = logfull
+					break
+				}
+			} 
+
+			return
+		</func>
+
+		<func name="GetTop" var="test Test" return="(top []TopDist)">
+		valm := make(map[string]float64)
+		for cnt, _ := range test.HeapMinute {
+			logfull,_ := core.RunCmdSmart(fmt.Sprintf("go tool pprof -top %s", filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt ) )) ) )
+			retset := strings.Split(logfull,"\n")
+			retset = retset[4:]
+			
+			for _, str := range retset {
+				strfm := strings.Replace(strings.TrimSpace(str), "   "," ",-1 ) 
+				strfm = strings.Replace(strfm, "  "," ", -1)
+				
+				subset := strings.Split(strfm," ")
+				
+				if len(subset) > 5 {
+					
+					subsettwo := strings.Split(subset[len(subset) - 1], "   ")
+					
+					if strings.Contains(strfm," (inline)") {
+						subsettwo = append([]string{subset[len(subset) - 3]},subsettwo...)
+					} else if len(subsettwo) == 1 {
+						subsettwo = append([]string{subset[len(subset) - 2]},subsettwo...)
+					}
+					//fmt.Println(subsettwo)
+					_,exts := valm[subsettwo[0]]
+					if !exts {
+						valm[subsettwo[0]] = 0
+					}
+					f, _ := strconv.ParseFloat(strings.Replace( subset[1],"%","", -1), 64)
+
+					valm[subsettwo[0]] += f 
+				}
+				}
+			}
+
+			tperc := 0.0
+			for key,val := range valm {
+				perc := ( val/float64(len(test.HeapMinute) ) )
+				top = append(top, TopDist{Name: key, Percent : perc })
+				tperc += perc
+			}
+
+			tperc = 100.0 - tperc
+			top = append(top, TopDist{Name:"Other samples", Percent : tperc})
+			valm = nil
+			
+			return
+		</func>
+
+		<func name="GetCard" var="test Test" return="(res string)">
+			bc, err := ioutil.ReadFile(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID) ) )
+			if err != nil {
+				res = err.Error()
+				return
+			} 
+			res = string(bc)
+			return
+		</func>
+
+		<func name="Start" var="test Test" return="(done  bool)">
+			test.Working = true
+			test.Start = time.Now()
+			UpdateTest(test)
+			SaveConfig()
+			runtime.GOMAXPROCS(runtime.NumCPU() + Mset.Settings.Threads)
+			go TestFrame(test)
+			done = true
+			return
+		</func>
+
+		<func name="Cancel" var="test Test" return="(done  bool)">
+			test.Working = false
+			test.End = time.Now()
+			UpdateTest(test)
+			SaveConfig()
+			
+			done = true
+			return
+		</func>
+
+		<func name="Nuke" var="" return="(done bool)">
+			err := os.RemoveAll(cleoWorkspace)
+			if err != nil {
+				panic(err)
+			}
+			err = os.MkdirAll(cleoWorkspace, 0700)
+			if err != nil {
+				panic(err)
+			}
+			done = true
+			Mset = &CleoSet{}
+			SaveConfig()
+			return
+		</func>
+
+		<func name="UpdateApp" var="app App" return="(done bool)">
+			UpdateEntry(app)
+			SaveConfig()
+			done = true
+			return
+		</func>
+
+		<func name="UpdateTest" var="test Test" return="(done bool)">
+			UpdateTest(test)
+			SaveConfig()
+			done = true
+			return
+		</func>
+
+		<func name="UpdateSettings" var="settings Setting" return="(done bool)">
+			Mset.Settings = settings
+			SaveConfig()
+			done = true
+			return
+		</func>
+
+
+
+		<func name="DeleteApp" var="app App" return="(done bool)">
+			newset := RmEntry(app)
+			Mset.Apps = newset
+			SaveConfig()
+			done = true
+			return
+		</func>
+
+		<func name="DeleteTest" var="test Test" return="(done bool)">
+			newset := RmTest(test)
+			Mset.Tests = newset
+			SaveConfig()
+			done = true
+			return
+		</func>
+
+
+
+
+	</methods>
+
+	<templates>
+
+	</templates>
+	<endpoints>
+  
+	</endpoints>
+</gos>

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en" ng-app="app">
+  <head>
+    <title>Cleo > Manage tests.</title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="main.css">
+    <script src="https://use.fontawesome.com/d102afacbe.js"></script>
+
+  </head>
+  <body ng-controller="cleo-tests">
+   
+    <nav class="navbar fixed-top  navbar-dark navbar-expand-lg bg-dark ">
+  <a class="navbar-brand" href="#">cleo</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item ">
+        <a class="nav-link" href="/">Dashboard </a>
+      </li>
+  
+      <li class="nav-item dropdown ">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Web Applications
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="/add_app">Add</a>
+          <a class="dropdown-item " href="/apps">Manage</a>
+        </div>
+      </li>
+
+       <li class="nav-item active">
+        <a class="nav-link" href="/tests">Tests  <span class="sr-only">(current)</span></a>
+      </li>
+        <li class="nav-item">
+        <a class="nav-link" href="/settings">Settings</a>
+      </li>
+    
+    </ul>
+ 
+  </div>
+</nav>
+
+
+<div class="container inversed pd-top">
+<nav aria-label="breadcrumb" role="navigation">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/">Cleo</a></li>
+     <li class="breadcrumb-item active">Tests</li>
+    
+  </ol>
+</nav>
+     <div ng-show='alert.text != ""' class="alert " ng-class="{'alert-success' : !alert.danger,'alert-danger': alert.danger}" role="alert">
+  <h4 class="alert-heading" ng-show="!alert.danger">Success</h4>
+   <h4 class="alert-heading" ng-show="alert.danger">Error</h4>
+  <p>{{  alert.text }}</p>
+  <p class="mb-0"> <a href="#" ng-click="(alert.text = '')" class="alert-class">Dismiss</a> </p>
+</div>
+    <div class="row">
+      
+      <div  ng-class="{'col-md-3': edit.ID, 'col-md-12 text-center': !edit.ID}"> 
+      <div class="btn-group pull-right" role="group" aria-label="Basic example">
+         <a href="/add_test" class="btn btn-sm btn-primary ">+ Add</a>
+        <button class="btn btn-sm" ng-click="Refresh()">refresh</button>      
+        </div>
+      <h5 class="text-left">Tests</h5>
+      <hr>
+
+       <div ng-show="!tests || (tests.length == 0) " ng-if="!working">
+        
+          <p class="text-muted">No tests found.</p>
+          <p><a href="/add_test" class="btn btn-sm btn-primary">+ Add</a></p>
+          <hr>  
+        </div>
+
+
+        <div ng-repeat="test in tests">
+          <button class="btn btn-sm pull-right" ng-click="Edit(test)">Edit</button>
+          <h6>{{ test.Name }}</h6>
+          <span class="badge bg-info" ng-if="!test.HeapMinute && !test.Finished">pending</span>
+           <span class="badge bg-danger" ng-if="!test.HeapMinute && test.Finished">No data</span>
+          <span class="badge bg-primary" ng-if="test.Working">Running</span>
+            <span class="badge bg-success" ng-if="test.Finished && !test.Working">Finished</span>
+          <hr>  
+        </div>
+      </div>
+      <div class="col-md-9" ng-if="edit.ID">
+        <button class="btn btn-primary" ng-click="Edit({})">Back</button>
+        <hr>
+
+        <div class="row">
+        <div class="col-sm-6">
+        <form name="form">
+        <p class="text-white bg-dark">ID : {{ edit.ID }}</p>
+        <p class="text-white bg-primary" ng-if="edit.Working"> Started <time am-time-ago="edit.Start"></time></p>
+        <p>Test nickname.</p>
+          <input type="text"  ng-disabled="working"  placeholder="Test nickname." ng-model="edit.Name" class="form-control" required/><br>
+
+        <p>Test target</p>
+        <select class="form-control" required ng-model="edit.TargetID">
+            <option ng-repeat="app in apps" value="{{ app.ID }}">{{ app.Name }} : {{ app.Path }}</option>
+        </select><br >
+          <p>Number of requests to perform</p>
+          <input type="number"  ng-disabled="working"  placeholder="." ng-model="edit.NReqs" class="form-control" required/><br>
+
+          <!-- Data.Path,Method-->
+        </form>
+        </div>
+        <div class="col-sm-6">
+
+              <div class="input-group">
+      <div class="input-group-btn">
+        <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          {{ edit.Method }}<span ng-if="!edit.Method || edit.Method == ''">Request method</span>
+        </button>
+        <div class="dropdown-menu  bg-primary">
+          <a class="dropdown-item" href="#" ng-click="edit.Method = 'POST'">POST</a>
+          <a class="dropdown-item" href="#" ng-click="edit.Method = 'GET'">GET</a>
+          <a class="dropdown-item" href="#" ng-click="edit.Method = 'DELETE'">DELETE</a>
+          <a class="dropdown-item" href="#" ng-click="edit.Method = 'PUT'">PUT</a>
+          <a class="dropdown-item" href="#" ng-click="edit.Method = 'UPDATE'">UPDATE</a>
+         <a class="dropdown-item" href="#" ng-click="edit.Method = 'RESET'">RESET</a>
+        </div>
+      </div>
+      <input type="text" class="form-control" ng-model="edit.Path" placeholder="URL to test">
+    </div>
+    <br >
+    <p><input type="text" class="form-control" placeholder="The http headers sent separated by '\n'" ng-model="edit.H"></p>
+    <p><textarea class="form-control" style="min-height: 70px;" placeholder="Data" ng-model="edit.Data"></textarea></p>
+
+        <h6>Test controls</h6>
+        <hr>
+          <p> <button class="btn btn-primary btn-lg btn-block" ng-disabled="working || (!edit.Finished || !edit.HeapMinute)" data-toggle="modal" data-target="#exampleModal">View report</button></p>
+         <p> <button class="btn btn-success btn-lg btn-block" ng-disabled="working" ng-if="!edit.Working" ng-click="Start()">Start test</button></p>
+         <!-- <p> <button class="btn btn-danger btn-lg btn-block" ng-disabled="working" ng-if="edit.Working"  ng-click="Cancel()">Cancel test</button></p> -->
+        </div>
+
+        </div>
+        <hr>
+        <button class="btn btn-primary btn-sm" ng-disabled="working || !form.$valid" ng-click="UpdateTest()">Update</button>   <button ng-click="DeleteTest()" ng-disabled="working" class="btn pull-right btn-danger btn-sm"><span ng-show="!confirmdel">Delete</span><span ng-show="confirmdel">Are you sure?</span> </button>
+      </div>
+    </div>
+</div>
+
+
+
+<!-- Modal -->
+<div class="modal fade " id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModal" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-primary">
+        <h5 class="modal-title text-white" id="exampleModalLongTitle">Report</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div ng-if="edit.ID" class="modal-body">
+
+      <p>Your test lasted {{ report.duration }} minutes.</p>
+      <hr style="border-color:#333">
+      <h5>Heap sizes during test.</h5>
+      <hr style="border-color:#333">
+       <canvas id="reportChart" style="width:100%" height="130"></canvas>
+       <br />
+        <h5>Heap object count during test.</h5>
+      <hr style="border-color:#333">
+       <canvas id="objChart" style="width:100%" height="130"></canvas>
+
+          <div ng-show="!report.current" class="row">
+            <div class="col-sm-8">
+              
+             <h5>Top heap samples</h5>
+            <hr style="border-color:#333">
+             <canvas id="topChart" style="width:100%" height="160"></canvas>
+            </div>
+            <div class="col-sm-4">
+                <h5>Explore samples</h5>
+                <hr style="border-color:#333">
+                <button class="btn btn-sm" ng-repeat="t in report.top" ng-click="List(t.Name)">{{ t.Name  }}</button>
+            </div>
+
+
+          </div>
+          <div ng-show="report.current">
+          <button class="pull-right btn btn-danger btn-sm" ng-click="report.current = ''">Close</button> 
+            <h5>{{ report.current }}</h5>
+            <hr style="border-color:#333">
+            <textarea class="form-control" style="min-height: 300px" readonly ng-model="report.list"></textarea>
+          </div>
+       
+          <div ng-if="report.card">
+           <h5>Benchmark report.</h5>
+            <hr style="border-color:#333">
+            <textarea class="form-control" style="min-height: 300px" readonly ng-model="report.card"></textarea>
+
+          </div>
+     
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="/funcfactory.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.6/angular.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.9.0/moment.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-moment/0.9.0/angular-moment.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.min.js"></script>
+    <script type="text/javascript" src="ang/apps.js"></script>
+  </body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" ng-app="app">
+  <head>
+    <title>Cleo > Manage apps.</title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="main.css">
+    <script src="https://use.fontawesome.com/d102afacbe.js"></script>
+
+  </head>
+  <body ng-controller="cleo-apps">
+   
+    <nav class="navbar fixed-top  navbar-dark navbar-expand-lg bg-dark ">
+  <a class="navbar-brand" href="#">cleo</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item ">
+        <a class="nav-link" href="/">Dashboard </a>
+      </li>
+  
+      <li class="nav-item dropdown active">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Web Applications <span class="sr-only">(current)</span>
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="/add_app">Add</a>
+          <a class="dropdown-item active" href="/apps">Manage</a>
+        </div>
+      </li>
+
+       <li class="nav-item">
+        <a class="nav-link" href="/tests">Tests</a>
+      </li>
+         <li class="nav-item">
+        <a class="nav-link" href="/settings">Settings</a>
+      </li>
+    
+    </ul>
+ 
+  </div>
+</nav>
+
+
+<div class="container inversed pd-top">
+<nav aria-label="breadcrumb" role="navigation">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/">Cleo</a></li>
+     <li class="breadcrumb-item active">Web applications</li>
+    
+  </ol>
+</nav>
+     <div ng-show='alert.text != ""' class="alert " ng-class="{'alert-success' : !alert.danger,'alert-danger': alert.danger}" role="alert">
+  <h4 class="alert-heading" ng-show="!alert.danger">Success</h4>
+   <h4 class="alert-heading" ng-show="alert.danger">Error</h4>
+  <p>{{  alert.text }}</p>
+  <p class="mb-0"> <a href="#" ng-click="(alert.text = '')" class="alert-class">Dismiss</a> </p>
+</div>
+    <div class="row">
+      
+      <div  ng-class="{'col-md-3': edit.ID, 'col-md-12 text-center': !edit.ID}"> 
+        <button class="btn btn-sm pull-right" ng-click="Refresh()">refresh</button>
+      <h5 class="text-left">Applications</h5>
+      <hr>
+
+       <div ng-show="!apps || (apps.length == 0) " ng-if="!working">
+        
+          <p class="text-muted">No apps found.</p>
+          <p><a href="/add_app" class="btn btn-sm btn-primary">+ Add</a></p>
+          <hr>  
+        </div>
+
+
+        <div ng-repeat="app in apps">
+          <button class="btn btn-sm pull-right" ng-click="Edit(app)">Edit</button>
+          <h6>{{ app.Name }}</h6>
+          <p class="text-muted">{{ app.Path }}</p>
+          <hr>  
+        </div>
+      </div>
+      <div class="col-md-9" ng-if="edit.ID">
+        <button class="btn btn-primary" ng-click="Edit({})">Back</button>
+        <hr>
+        <form name="form">
+        <p class="text-white bg-dark">ID : {{ edit.ID }}</p>
+        <label>Name</label> <input type="text"  ng-disabled="working"  placeholder="App nickname." ng-model="edit.Name" class="form-control" required/><br>
+         <label>Path</label> <input type="text"  ng-disabled="working"  placeholder="Path of app package." ng-model="edit.Path" class="form-control" required/><br>
+         <input type="checkbox" ng-model="edit.FetchOntest"> <label>Download your package on each test.</label>
+        </form>
+        <hr>
+        <button class="btn btn-primary btn-sm" ng-disabled="working || !form.$valid" ng-click="UpdateApp()">Update</button> <button class="btn btn-primary btn-sm" ng-disabled="working" data-toggle="modal" data-target="#exampleModal">Environment variables</button>  <button ng-click="DeleteApp()" ng-disabled="working" class="btn pull-right btn-danger btn-sm"><span ng-show="!confirmdel">Delete</span><span ng-show="confirmdel">Are you sure?</span> </button>
+      </div>
+    </div>
+</div>
+
+<div class="modal" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Environment variables</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div ng-if="edit.ID" class="modal-body">
+              <div ng-show="alert.text != ''" class="alert alert-success" role="alert">
+  <h4 ng-show="alert.danger" class="alert-heading">Application saved!</h4>
+  <p>Your web application is connected to cleo.</p>
+  <p class="mb-0"> <a href="#" ng-click="(alert.text = '')" class="alert-class">Dismiss</a> </p>
+</div>
+        <h5>Current settings</h5>
+        <hr >
+        <p class="text-center text-muted" ng-if="!edit.Envs || edit.Envs.length == 0">No variables set.</p>
+        <div ng-repeat="env in edit.Envs">
+          <button class="pull-right btn btn-sm btn-danger" ng-click="DeleteEnv(env)">Delete</button>
+          <h5> $ {{ env.Key }} : {{ env.Value }}</h5>
+          <hr >
+        </div>
+
+        <h5>New variable</h5>
+      <div class="row">
+        <div class="col-sm-6"><input type="text" class="form-control" ng-model="nenv.Key" placeholder="Key"></div>
+        <div class="col-sm-6"><input type="text" class="form-control" ng-model="nenv.Value" placeholder="Value"></div>
+       
+
+      </div> <br />
+      <p class="text-center"><button class="btn btn-sm btn-primary btn-block" ng-click="AddEnv()">Add</button></p>
+      </div>
+      <div class="modal-footer">
+
+        <button type="button" ng-click="UpdateApp()" ng-disabled="working" class="btn btn-primary">Save changes</button>
+        <button type="button" class="btn btn-secondary" ng-disabled="working" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="/funcfactory.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.6/angular.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.9.0/moment.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-moment/0.9.0/angular-moment.min.js"></script>
+    <script type="text/javascript" src="ang/apps.js"></script>
+  </body>
+</html>

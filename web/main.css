@@ -1,0 +1,44 @@
+.pd-top {
+	padding-top: 68px;
+}
+
+body,html {
+	background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+  overflow: auto;
+  border-color:#333;
+  height: 100%;
+  width:100%;
+  position: fixed;
+}
+body {
+  display: none;
+
+}
+.inversed {
+	color:#fff;
+}
+
+.inversed hr {
+	    border-top: 1px solid #666;
+}
+
+
+.rnd-info {
+    float: right;  
+    background: #333;
+    padding: 5px;
+    margin-top:3px;
+	
+}
+
+.ng-dirty.ng-invalid {
+  border-color:red;
+}
+
+.card {
+  border-radius: 1px;
+}
+
+body.ng-scope {
+  display: block;
+}
