@@ -9,12 +9,26 @@ A web application used to analyze other web applications written in Go. It gener
 
 ## Install
 Install with :
+		
 		$ go get github.com/cheikhshift/cleo
 
 ## Launch
 Run the following command to launch application :
+		
 		$ cleo
 
+## Go project setup
+You Go web application should retrieve the port number to listen on from env. variable $PORT.
+
+Example
+	
+	...
+	port := ":defaultport"
+	if envport := os.ExpandEnv("$PORT"); envport != "" {
+		port = fmt.Sprintf(":%s", envport)
+	}
+	...
+	log.Fatal(http.ListenAndServe(port, nil) )
 
 ## Projects used 
 1. Twitter bootstrap beta 4.0.0-beta.2
