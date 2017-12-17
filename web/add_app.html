@@ -65,7 +65,7 @@
         <form  ng-submit="Add()" name="form">
           <p>Application nickname.</p>
           <input type="text"  ng-disabled="working"  placeholder="App nickname." ng-model="app.Name" class="form-control" required/><br>
-          <p>Enter your app's package name. This is the path to your project relative to your $GOPATH.</p>
+          <p>Enter your app's package name. This is the path to your project relative to path $GOPATH/src.</p>
           <input type="text"  ng-disabled="working" placeholder="App path. ie : path.com/yourusername/foldername" class="form-control" ng-model="app.Path" required /><br>
         </form>
 
