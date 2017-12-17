@@ -7,6 +7,10 @@ A web application used to analyze other web applications written in Go. It gener
 3. $GOPATH set. Guide [here](https://learn-golang.com/en/getting-started/)
 4. Unix/Linux OS.
 
+## Install
+Install with :
+		$ go get github.com/cheikhshift/cleo
+
 ## Launch
 Run the following command to launch application :
 		$ cleo
