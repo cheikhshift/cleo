@@ -241,7 +241,6 @@ func TestFrame(test Test) {
 
 							test.HeapMinute = append(test.HeapMinute, hframe)
 							body = nil
-							fmt.Println("Latest frame :", hframe)
 							time.Sleep(time.Second * 2)
 							HeapCount++
 						}
