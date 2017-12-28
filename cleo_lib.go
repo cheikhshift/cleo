@@ -115,7 +115,7 @@ func TestFrame(test Test) {
 	}
 	os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s-cleo", test.ID)))
 	os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID)))
-	os.Remove(fmt.Sprintf("/%s", filepath.Join(pkgpath...)))
+	defer os.Remove(fmt.Sprintf("/%s", filepath.Join(pkgpath...)))
 
 	err := ioutil.WriteFile(fmt.Sprintf("/%s", filepath.Join(pkgpath...)), CleoUtil, 0700)
 	if err != nil {
