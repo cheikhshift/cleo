@@ -179,7 +179,6 @@ func TestFrame(test Test) {
 					test.Working = false
 					test.Finished = true
 					test.End = time.Now()
-					HeapCount--
 					AlertSys(false, fmt.Sprintf("Test %s complete.", test.Name), time.Now())
 					break
 				} else {
