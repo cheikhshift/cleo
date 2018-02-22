@@ -133,7 +133,10 @@
 			return
 		</func>
   		<func name="GetList" var="test Test, lookup string" return="(list string)">
-			
+			if strings.Contains(lookup, "*") {
+				parts := strings.Split(lookup, ".")
+				lookup = fmt.Sprintf("%s()", parts[len(parts) - 1])
+			}
 			for cnt, _ := range test.HeapMinute {
 				cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt ) )) )
 				logfull,_ := core.RunCmdSmart(cmd )

@@ -12,15 +12,22 @@ import (
 	"github.com/fatih/color"
 	"github.com/gorilla/context"
 	"github.com/gorilla/sessions"
+	"github.com/opentracing/opentracing-go"
 	"html"
 	"html/template"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
+	_ "net/http/pprof"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sourcegraph.com/sourcegraph/appdash"
+	appdashot "sourcegraph.com/sourcegraph/appdash/opentracing"
+	"sourcegraph.com/sourcegraph/appdash/traceapp"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +35,7 @@ import (
 
 var store = sessions.NewCookieStore([]byte("a very very very very secret key"))
 
-var Prod = true
+var Prod = false
 
 var TemplateFuncStore template.FuncMap
 var templateCache = gosweb.NewTemplateCache()
@@ -42,7 +49,7 @@ var FuncStored = StoreNetfn()
 
 type dbflf db.O
 
-func renderTemplate(w http.ResponseWriter, p *gosweb.Page) {
+func renderTemplate(w http.ResponseWriter, p *gosweb.Page, span opentracing.Span) {
 	defer func() {
 		if n := recover(); n != nil {
 			color.Red(fmt.Sprintf("Error loading template in path : web%s.tmpl reason : %s", p.R.URL.Path, n))
@@ -62,15 +69,29 @@ func renderTemplate(w http.ResponseWriter, p *gosweb.Page) {
 			} else {
 				pag.R = p.R
 				pag.Session = p.Session
-				renderTemplate(w, pag) ///your-500-page"
+				renderTemplate(w, pag, span) ///your-500-page"
 
 			}
 		}
 	}()
 
+	var sp opentracing.Span
+	opName := fmt.Sprintf("Building template %s%s", p.R.URL.Path, ".tmpl")
+
+	if true {
+		carrier := opentracing.HTTPHeadersCarrier(p.R.Header)
+		wireContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
+		if err != nil {
+			sp = opentracing.StartSpan(opName)
+		} else {
+			sp = opentracing.StartSpan(opName, opentracing.ChildOf(wireContext))
+		}
+	}
+	defer sp.Finish()
+
 	// TemplateFuncStore
 
-	if _, ok := templateCache.Get(p.R.URL.Path); !ok && Prod {
+	if _, ok := templateCache.Get(p.R.URL.Path); !ok || !Prod {
 		var tmpstr = string(p.Body)
 		var localtemplate = template.New(p.R.URL.Path)
 
@@ -98,7 +119,7 @@ func renderTemplate(w http.ResponseWriter, p *gosweb.Page) {
 		if pag.IsResource {
 			w.Write(pag.Body)
 		} else {
-			renderTemplate(w, pag) // "/your-500-page"
+			renderTemplate(w, pag, span) // "/your-500-page"
 
 		}
 		return
@@ -117,11 +138,18 @@ func renderTemplate(w http.ResponseWriter, p *gosweb.Page) {
 // this http.HandlerFunc.
 // Use MakeHandler(http.HandlerFunc) to serve your web
 // directory from memory.
-func MakeHandler(fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
+func MakeHandler(fn func(http.ResponseWriter, *http.Request, opentracing.Span)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		if attmpt := apiAttempt(w, r); !attmpt {
-			fn(w, r)
+		span := opentracing.StartSpan(fmt.Sprintf("%s %s", r.Method, r.URL.Path))
+		defer span.Finish()
+		carrier := opentracing.HTTPHeadersCarrier(r.Header)
+		if err := span.Tracer().Inject(span.Context(), opentracing.HTTPHeaders, carrier); err != nil {
+			log.Fatalf("Could not inject span context into header: %v", err)
+		}
+
+		if attmpt := apiAttempt(w, r, span); !attmpt {
+			fn(w, r, span)
 		}
 		context.Clear(r)
 
@@ -132,7 +160,7 @@ func mResponse(v interface{}) string {
 	data, _ := json.Marshal(&v)
 	return string(data)
 }
-func apiAttempt(w http.ResponseWriter, r *http.Request) (callmet bool) {
+func apiAttempt(w http.ResponseWriter, r *http.Request, span opentracing.Span) (callmet bool) {
 	var response string
 	response = ""
 	var session *sessions.Session
@@ -397,7 +425,7 @@ func DebugTemplatePath(tmpl string, intrf interface{}) {
 	}
 
 }
-func Handler(w http.ResponseWriter, r *http.Request) {
+func Handler(w http.ResponseWriter, r *http.Request, span opentracing.Span) {
 	var p *gosweb.Page
 	p, err := loadPage(r.URL.Path)
 	var session *sessions.Session
@@ -406,11 +434,26 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		session, _ = store.New(r, "session-")
 	}
 
+	var sp opentracing.Span
+	opName := fmt.Sprintf(fmt.Sprintf("Web:/%s", r.URL.Path))
+
+	if true {
+		carrier := opentracing.HTTPHeadersCarrier(r.Header)
+		wireContext, err := opentracing.GlobalTracer().Extract(opentracing.HTTPHeaders, carrier)
+		if err != nil {
+			sp = opentracing.StartSpan(opName)
+		} else {
+			sp = opentracing.StartSpan(opName, opentracing.ChildOf(wireContext))
+		}
+	}
+	defer sp.Finish()
+
 	if err != nil {
 		log.Println(err.Error())
 
 		w.WriteHeader(http.StatusNotFound)
-
+		span.SetTag("error", true)
+		span.LogEvent(fmt.Sprintf("%s request at %s, reason : %s ", r.Method, r.URL.Path, err))
 		pag, err := loadPage("/your-404-page")
 
 		if err != nil {
@@ -430,7 +473,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if pag.IsResource {
 			w.Write(pag.Body)
 		} else {
-			renderTemplate(w, pag) //"/your-500-page"
+			renderTemplate(w, pag, span) //"/your-500-page"
 		}
 		session = nil
 		context.Clear(r)
@@ -441,7 +484,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		p.Session = session
 		p.R = r
-		renderTemplate(w, p) //fmt.Sprintf("web%s", r.URL.Path)
+		renderTemplate(w, p, span) //fmt.Sprintf("web%s", r.URL.Path)
 		session.Save(r, w)
 		// log.Println(w)
 	} else {
@@ -469,10 +512,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 var WebCache = gosweb.NewCache()
 
 func loadPage(title string) (*gosweb.Page, error) {
-
-	if lPage, ok := WebCache.Get(title); ok {
-		return &lPage, nil
-	}
 
 	var nPage = gosweb.Page{}
 	if roottitle := (title == "/"); roottitle {
@@ -531,6 +570,8 @@ func loadPage(title string) (*gosweb.Page, error) {
 		body = nil
 		return &nPage, nil
 	}
+
+	//wheredefault
 
 }
 
@@ -736,231 +777,475 @@ func NetstructTopDist() *TopDist { return &TopDist{} }
 //
 func NetLoadWebAsset(args ...interface{}) string {
 
-	data, err := Asset(fmt.Sprintf("web%s", args[0].(string)))
-	if err != nil {
-		return err.Error()
-	}
-	return string(data)
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `data,err := Asset( fmt.Sprintf("web%s", args[0].(string) ) )`
+	data, err := Asset(fmt.Sprintf("web%s", args[0].(string)))
+	lastLine = `if err != nil {`
+	if err != nil {
+		lastLine = `return err.Error()`
+		return err.Error()
+		lastLine = `}`
+	}
+	lastLine = `return string(data)`
+	return string(data)
 }
 
 //
 func NetAddApp(app App) (done bool) {
 
-	app.ID = core.NewLen(10)
-	Mset.Apps = append(Mset.Apps, app)
-	SaveConfig()
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `app.ID = core.NewLen(10)`
+	app.ID = core.NewLen(10)
+	lastLine = `Mset.Apps = append(Mset.Apps, app)`
+	Mset.Apps = append(Mset.Apps, app)
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 //
 func NetAddTest(test Test) (done bool) {
 
-	test.ID = core.NewLen(10)
-	Mset.Tests = append(Mset.Tests, test)
-	SaveConfig()
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `test.ID = core.NewLen(10)`
+	test.ID = core.NewLen(10)
+	lastLine = `Mset.Tests = append(Mset.Tests, test)`
+	Mset.Tests = append(Mset.Tests, test)
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 //
 func NetCleo() (cleo *CleoSet) {
 
-	cleo = Mset
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `cleo = Mset`
+	cleo = Mset
+	lastLine = `return`
+	return
 }
 
 //
 func NetDeleteAlerts() (done bool) {
 
-	Mset.Alerts = []Alert{}
-	SaveConfig()
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `Mset.Alerts = []Alert{}`
+	Mset.Alerts = []Alert{}
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `return`
+	return
 }
 
 //
 func NetGetList(test Test, lookup string) (list string) {
 
-	for cnt, _ := range test.HeapMinute {
-		cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt))))
-		logfull, _ := core.RunCmdSmart(cmd)
+	lastLine := ""
 
-		retset := strings.Split(logfull, "\n")
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
 
-		if len(retset) > 2 {
-			list = logfull
-			break
 		}
+	}()
+	lastLine = `if strings.Contains(lookup, "*") {`
+	if strings.Contains(lookup, "*") {
+		lastLine = `parts := strings.Split(lookup, ".")`
+		parts := strings.Split(lookup, ".")
+		lastLine = `lookup = fmt.Sprintf("%s()", parts[len(parts) - 1])`
+		lookup = fmt.Sprintf("%s()", parts[len(parts)-1])
+		lastLine = `}`
 	}
-
+	lastLine = `for cnt, _ := range test.HeapMinute {`
+	for cnt, _ := range test.HeapMinute {
+		lastLine = `cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt ) )) )`
+		cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt))))
+		lastLine = `logfull,_ := core.RunCmdSmart(cmd )`
+		logfull, _ := core.RunCmdSmart(cmd)
+		lastLine = `retset := strings.Split(logfull,"\n")`
+		retset := strings.Split(logfull, "\n")
+		lastLine = `if len(retset) > 2 {`
+		if len(retset) > 2 {
+			lastLine = `list = logfull`
+			list = logfull
+			lastLine = `break`
+			break
+			lastLine = `}`
+		}
+		lastLine = `}`
+	}
+	lastLine = `return`
 	return
-
 }
 
 //
 func NetGetTop(test Test) (top []TopDist) {
 
-	valm := make(map[string]float64)
-	for cnt, _ := range test.HeapMinute {
-		logfull, _ := core.RunCmdSmart(fmt.Sprintf("go tool pprof -top %s", filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt)))))
-		retset := strings.Split(logfull, "\n")
-		retset = retset[4:]
+	lastLine := ""
 
-		for _, str := range retset {
-			strfm := strings.Replace(strings.TrimSpace(str), "   ", " ", -1)
-			strfm = strings.Replace(strfm, "  ", " ", -1)
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
 
-			subset := strings.Split(strfm, " ")
-
-			if len(subset) > 5 {
-
-				subsettwo := strings.Split(subset[len(subset)-1], "   ")
-
-				if strings.Contains(strfm, " (inline)") {
-					subsettwo = append([]string{subset[len(subset)-3]}, subsettwo...)
-				} else if len(subsettwo) == 1 {
-					subsettwo = append([]string{subset[len(subset)-2]}, subsettwo...)
-				}
-				//fmt.Println(subsettwo)
-				_, exts := valm[subsettwo[0]]
-				if !exts {
-					valm[subsettwo[0]] = 0
-				}
-				f, _ := strconv.ParseFloat(strings.Replace(subset[1], "%", "", -1), 64)
-
-				valm[subsettwo[0]] += f
-			}
 		}
+	}()
+	lastLine = `valm := make(map[string]float64)`
+	valm := make(map[string]float64)
+	lastLine = `for cnt, _ := range test.HeapMinute {`
+	for cnt, _ := range test.HeapMinute {
+		lastLine = `logfull,_ := core.RunCmdSmart(fmt.Sprintf("go tool pprof -top %s", filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt ) )) ) )`
+		logfull, _ := core.RunCmdSmart(fmt.Sprintf("go tool pprof -top %s", filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt)))))
+		lastLine = `retset := strings.Split(logfull,"\n")`
+		retset := strings.Split(logfull, "\n")
+		lastLine = `retset = retset[4:]`
+		retset = retset[4:]
+		lastLine = `for _, str := range retset {`
+		for _, str := range retset {
+			lastLine = `strfm := strings.Replace(strings.TrimSpace(str), "   "," ",-1 )`
+			strfm := strings.Replace(strings.TrimSpace(str), "   ", " ", -1)
+			lastLine = `strfm = strings.Replace(strfm, "  "," ", -1)`
+			strfm = strings.Replace(strfm, "  ", " ", -1)
+			lastLine = `subset := strings.Split(strfm," ")`
+			subset := strings.Split(strfm, " ")
+			lastLine = `if len(subset) > 5 {`
+			if len(subset) > 5 {
+				lastLine = `subsettwo := strings.Split(subset[len(subset) - 1], "   ")`
+				subsettwo := strings.Split(subset[len(subset)-1], "   ")
+				lastLine = `if strings.Contains(strfm," (inline)") {`
+				if strings.Contains(strfm, " (inline)") {
+					lastLine = `subsettwo = append([]string{subset[len(subset) - 3]},subsettwo...)`
+					subsettwo = append([]string{subset[len(subset)-3]}, subsettwo...)
+					lastLine = `} else if len(subsettwo) == 1 {`
+				} else if len(subsettwo) == 1 {
+					lastLine = `subsettwo = append([]string{subset[len(subset) - 2]},subsettwo...)`
+					subsettwo = append([]string{subset[len(subset)-2]}, subsettwo...)
+					lastLine = `}`
+				}
+				lastLine = `//fmt.Println(subsettwo)`
+				//fmt.Println(subsettwo)
+				lastLine = `_,exts := valm[subsettwo[0]]`
+				_, exts := valm[subsettwo[0]]
+				lastLine = `if !exts {`
+				if !exts {
+					lastLine = `valm[subsettwo[0]] = 0`
+					valm[subsettwo[0]] = 0
+					lastLine = `}`
+				}
+				lastLine = `f, _ := strconv.ParseFloat(strings.Replace( subset[1],"%","", -1), 64)`
+				f, _ := strconv.ParseFloat(strings.Replace(subset[1], "%", "", -1), 64)
+				lastLine = `valm[subsettwo[0]] += f`
+				valm[subsettwo[0]] += f
+				lastLine = `}`
+			}
+			lastLine = `}`
+		}
+		lastLine = `}`
 	}
-
+	lastLine = `tperc := 0.0`
 	tperc := 0.0
+	lastLine = `for key,val := range valm {`
 	for key, val := range valm {
+		lastLine = `perc := ( val/float64(len(test.HeapMinute) ) )`
 		perc := (val / float64(len(test.HeapMinute)))
+		lastLine = `top = append(top, TopDist{Name: key, Percent : perc })`
 		top = append(top, TopDist{Name: key, Percent: perc})
+		lastLine = `tperc += perc`
 		tperc += perc
+		lastLine = `}`
 	}
-
+	lastLine = `tperc = 100.0 - tperc`
 	tperc = 100.0 - tperc
+	lastLine = `top = append(top, TopDist{Name:"Other samples", Percent : tperc})`
 	top = append(top, TopDist{Name: "Other samples", Percent: tperc})
+	lastLine = `valm = nil`
 	valm = nil
-
+	lastLine = `return`
 	return
-
 }
 
 //
 func NetGetCard(test Test) (res string) {
 
-	bc, err := ioutil.ReadFile(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID)))
-	if err != nil {
-		res = err.Error()
-		return
-	}
-	res = string(bc)
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `bc, err := ioutil.ReadFile(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID) ) )`
+	bc, err := ioutil.ReadFile(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID)))
+	lastLine = `if err != nil {`
+	if err != nil {
+		lastLine = `res = err.Error()`
+		res = err.Error()
+		lastLine = `return`
+		return
+		lastLine = `}`
+	}
+	lastLine = `res = string(bc)`
+	res = string(bc)
+	lastLine = `return`
+	return
 }
 
 //
 func NetStart(test Test) (done bool) {
 
-	test.Working = true
-	test.Start = time.Now()
-	UpdateTest(test)
-	SaveConfig()
-	runtime.GOMAXPROCS(runtime.NumCPU() + Mset.Settings.Threads)
-	go TestFrame(test)
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `test.Working = true`
+	test.Working = true
+	lastLine = `test.Start = time.Now()`
+	test.Start = time.Now()
+	lastLine = `UpdateTest(test)`
+	UpdateTest(test)
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `runtime.GOMAXPROCS(runtime.NumCPU() + Mset.Settings.Threads)`
+	runtime.GOMAXPROCS(runtime.NumCPU() + Mset.Settings.Threads)
+	lastLine = `go TestFrame(test)`
+	go TestFrame(test)
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 //
 func NetCancel(test Test) (done bool) {
 
+	lastLine := ""
+
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `test.Working = false`
 	test.Working = false
+	lastLine = `test.End = time.Now()`
 	test.End = time.Now()
+	lastLine = `UpdateTest(test)`
 	UpdateTest(test)
+	lastLine = `SaveConfig()`
 	SaveConfig()
-
+	lastLine = `done = true`
 	done = true
+	lastLine = `return`
 	return
-
 }
 
 //
 func NetNuke() (done bool) {
 
-	err := os.RemoveAll(cleoWorkspace)
-	if err != nil {
-		panic(err)
-	}
-	err = os.MkdirAll(cleoWorkspace, 0700)
-	if err != nil {
-		panic(err)
-	}
-	done = true
-	Mset = &CleoSet{}
-	SaveConfig()
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `err := os.RemoveAll(cleoWorkspace)`
+	err := os.RemoveAll(cleoWorkspace)
+	lastLine = `if err != nil {`
+	if err != nil {
+		lastLine = `panic(err)`
+		panic(err)
+		lastLine = `}`
+	}
+	lastLine = `err = os.MkdirAll(cleoWorkspace, 0700)`
+	err = os.MkdirAll(cleoWorkspace, 0700)
+	lastLine = `if err != nil {`
+	if err != nil {
+		lastLine = `panic(err)`
+		panic(err)
+		lastLine = `}`
+	}
+	lastLine = `done = true`
+	done = true
+	lastLine = `Mset = &CleoSet{}`
+	Mset = &CleoSet{}
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `return`
+	return
 }
 
 //
 func NetUpdateApp(app App) (done bool) {
 
-	UpdateEntry(app)
-	SaveConfig()
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `UpdateEntry(app)`
+	UpdateEntry(app)
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 //
 func NetUpdateTest(test Test) (done bool) {
 
-	UpdateTest(test)
-	SaveConfig()
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `UpdateTest(test)`
+	UpdateTest(test)
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 //
 func NetUpdateSettings(settings Setting) (done bool) {
 
-	Mset.Settings = settings
-	SaveConfig()
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `Mset.Settings = settings`
+	Mset.Settings = settings
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 //
 func NetDeleteApp(app App) (done bool) {
 
-	newset := RmEntry(app)
-	Mset.Apps = newset
-	SaveConfig()
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `newset := RmEntry(app)`
+	newset := RmEntry(app)
+	lastLine = `Mset.Apps = newset`
+	Mset.Apps = newset
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 //
 func NetDeleteTest(test Test) (done bool) {
 
-	newset := RmTest(test)
-	Mset.Tests = newset
-	SaveConfig()
-	done = true
-	return
+	lastLine := ""
 
+	defer func() {
+		if n := recover(); n != nil {
+			log.Println("Pipeline failed at line :", gosweb.GetLine(".//gos.gxml", lastLine), "Of file:.//gos.gxml:", strings.TrimSpace(lastLine))
+			log.Println("Reason : ", n)
+
+		}
+	}()
+	lastLine = `newset := RmTest(test)`
+	newset := RmTest(test)
+	lastLine = `Mset.Tests = newset`
+	Mset.Tests = newset
+	lastLine = `SaveConfig()`
+	SaveConfig()
+	lastLine = `done = true`
+	done = true
+	lastLine = `return`
+	return
 }
 
 func templateFNang(localid string, d interface{}) {
@@ -991,7 +1276,7 @@ func Netang(args ...interface{}) string {
 
 	output := new(bytes.Buffer)
 
-	if _, ok := templateCache.Get(localid); !ok {
+	if _, ok := templateCache.Get(localid); !ok || !Prod {
 
 		body, er := Asset(localid)
 		if er != nil {
@@ -1029,7 +1314,7 @@ func Netbang(d gosweb.NoStruct) string {
 	defer templateFNang(localid, d)
 	output := new(bytes.Buffer)
 
-	if _, ok := templateCache.Get(localid); !ok {
+	if _, ok := templateCache.Get(localid); !ok || !Prod {
 
 		body, er := Asset(localid)
 		if er != nil {
@@ -1105,7 +1390,7 @@ func Netserver(args ...interface{}) string {
 
 	output := new(bytes.Buffer)
 
-	if _, ok := templateCache.Get(localid); !ok {
+	if _, ok := templateCache.Get(localid); !ok || !Prod {
 
 		body, er := Asset(localid)
 		if er != nil {
@@ -1143,7 +1428,7 @@ func Netbserver(d gosweb.NoStruct) string {
 	defer templateFNserver(localid, d)
 	output := new(bytes.Buffer)
 
-	if _, ok := templateCache.Get(localid); !ok {
+	if _, ok := templateCache.Get(localid); !ok || !Prod {
 
 		body, er := Asset(localid)
 		if er != nil {
@@ -1219,7 +1504,7 @@ func Netjquery(args ...interface{}) string {
 
 	output := new(bytes.Buffer)
 
-	if _, ok := templateCache.Get(localid); !ok {
+	if _, ok := templateCache.Get(localid); !ok || !Prod {
 
 		body, er := Asset(localid)
 		if er != nil {
@@ -1257,7 +1542,7 @@ func Netbjquery(d gosweb.NoStruct) string {
 	defer templateFNjquery(localid, d)
 	output := new(bytes.Buffer)
 
-	if _, ok := templateCache.Get(localid); !ok {
+	if _, ok := templateCache.Get(localid); !ok || !Prod {
 
 		body, er := Asset(localid)
 		if er != nil {
@@ -1350,13 +1635,43 @@ func main() {
 	}
 
 	//psss go code here : func main()
-	store.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7,
-		HttpOnly: true,
-		Secure:   true,
-		Domain:   "",
+	store := appdash.NewMemoryStore()
+
+	// Listen on any available TCP port locally.
+	l, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		log.Fatal(err)
 	}
+	collectorPort := l.Addr().(*net.TCPAddr).Port
+
+	// Start an Appdash collection server that will listen for spans and
+	// annotations and add them to the local collector (stored in-memory).
+	cs := appdash.NewServer(l, appdash.NewLocalCollector(store))
+	go cs.Start()
+
+	// Print the URL at which the web UI will be running.
+	appdashPort := 8700
+	appdashURLStr := fmt.Sprintf("http://localhost:%d", appdashPort)
+	appdashURL, err := url.Parse(appdashURLStr)
+	if err != nil {
+		log.Fatalf("Error parsing %s: %s", appdashURLStr, err)
+	}
+	color.Red("✅ Important!")
+	log.Println("To see your traces, go to ", appdashURL)
+
+	// Start the web UI in a separate goroutine.
+	tapp, err := traceapp.New(nil, appdashURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tapp.Store = store
+	tapp.Queryer = store
+	go func() {
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", appdashPort), tapp))
+	}()
+
+	tracer := appdashot.NewTracer(appdash.NewRemoteCollector(fmt.Sprintf(":%d", collectorPort)))
+	opentracing.InitGlobalTracer(tracer)
 
 	port := ":9000"
 	if envport := os.ExpandEnv("$PORT"); envport != "" {
