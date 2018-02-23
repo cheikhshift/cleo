@@ -1,6 +1,10 @@
 # Cleo
 A web application used to analyze other web applications written in Go. It generates LARs (long-ass reports) of tests performed.
 
+### Updates :
+- Inspect CPU times.
+- Test applications built and deployed at external locations.
+
 ## Requirements
 1. Go lang
 2. go-work : install with `go get github.com/adjust/go-wrk`
@@ -44,3 +48,6 @@ Example
 ![enter image description here](screens/4.png)
 ![enter image description here](screens/5.png)
 ![enter image description here](screens/6.png)
+![enter image description here](screens/7.png)
+![enter image description here](screens/8.png)
+![enter image description here](screens/9.png)
