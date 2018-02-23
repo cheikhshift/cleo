@@ -16,18 +16,6 @@ import (
 
 var TestCount int
 
-const Utilname = "cleo_util.go"
-
-const HeapUrl = "/debug/pprof/heap"
-const DebugParam = "?debug=1"
-
-var CleoUtil = []byte(`package main
-
-
-import (
-	_ "net/http/pprof"
-)`)
-
 func Save(name string, v interface{}) error {
 
 	str := form.Encrypt(Key, mResponse(v))
@@ -151,11 +139,11 @@ func TestFrame(test Test) {
 		return
 	}
 	if Mset.Settings.Connections == 0 {
-		 Mset.Settings.Connections = 100
+		Mset.Settings.Connections = 100
 	}
 
 	if Mset.Settings.Threads == 0 {
-		 Mset.Settings.Threads = 2
+		Mset.Settings.Threads = 2
 	}
 
 	TestCount++
@@ -179,16 +167,10 @@ func TestFrame(test Test) {
 					test.Working = false
 					test.Finished = true
 					test.End = time.Now()
+					HeapCount--
 					AlertSys(false, fmt.Sprintf("Test %s complete.", test.Name), time.Now())
 					break
 				} else {
-					dft := 45 * time.Second
-					tr := &http.Transport{
-						MaxIdleConns:          2,
-						IdleConnTimeout:       dft,
-						ResponseHeaderTimeout: dft,
-						ExpectContinueTimeout: dft,
-					}
 
 					client := &http.Client{Transport: tr}
 					resp, err := client.Get(fmt.Sprintf("%s%s", addr, HeapUrl))
@@ -205,6 +187,30 @@ func TestFrame(test Test) {
 							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now())
 							break
 						}
+
+						//if test.CPU {
+						body = nil
+						client = &http.Client{Transport: tr}
+						resp, err = client.Get(fmt.Sprintf("%s%s", addr, ProfileUrl))
+
+						if err != nil {
+							test.Working = false
+							test.Finished = true
+							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now())
+							break
+						}
+
+						body, _ = ioutil.ReadAll(resp.Body)
+						fname = filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("p%v", HeapCount)))
+						err = ioutil.WriteFile(fname, body, 0700)
+						if err != nil {
+							test.Working = false
+							test.Finished = true
+							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now())
+							break
+						}
+						//}
+
 						body = nil
 						client = &http.Client{Transport: tr}
 						resp, err = client.Get(fmt.Sprintf("%s%s%s", addr, HeapUrl, DebugParam))
@@ -240,6 +246,7 @@ func TestFrame(test Test) {
 
 							test.HeapMinute = append(test.HeapMinute, hframe)
 							body = nil
+							fmt.Println("Latest frame :", hframe)
 							time.Sleep(time.Second * 2)
 							HeapCount++
 						}
@@ -254,9 +261,9 @@ func TestFrame(test Test) {
 cmd="%s"
 startServer="%s-cleo"
 eval "${startServer}" &>%s.log &disown
-sleep 20
+sleep %v
 eval "${cmd}" >%s.test &disown
-exit 0`, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), filepath.Join(cleoWorkspace, test.ID))
+exit 0`, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, filepath.Join(cleoWorkspace, test.ID))
 	bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.sh", test.ID))
 	ioutil.WriteFile(bspath, []byte(shscript), 0777)
 	core.RunCmdSmart(fmt.Sprintf("sh %s &>/dev/null", bspath))
