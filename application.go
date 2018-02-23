@@ -810,8 +810,7 @@ func NetDeleteAlerts() (done bool) {
 func NetGetList(test Test, lookup string) (list string) {
 
 	if strings.Contains(lookup, "*") {
-		parts := strings.Split(lookup, ".")
-		lookup = fmt.Sprintf("%s()", parts[len(parts)-1])
+		lookup = EscapeRegexp(lookup)
 	}
 	for cnt, _ := range test.HeapMinute {
 		cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("h%v", cnt))))
@@ -833,9 +832,9 @@ func NetGetList(test Test, lookup string) (list string) {
 func NetGetListCPU(test Test, lookup string) (list string) {
 
 	if strings.Contains(lookup, "*") {
-		parts := strings.Split(lookup, ".")
-		lookup = fmt.Sprintf("%s()", parts[len(parts)-1])
+		lookup = EscapeRegexp(lookup)
 	}
+
 	for cnt, _ := range test.HeapMinute {
 		cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("p%v", cnt))))
 		logfull, _ := core.RunCmdSmart(cmd)

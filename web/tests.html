@@ -218,7 +218,7 @@
                             <h5>Explore samples <span ng-if="(report.topCPU.length > 10)" class="text-primary text-sm">Total time : {{ report.totaltime }}ms</span></h5>
                             <hr style="border-color:#333">
                             <p><input type="text" ng-model="report.filter" class="form-control" placeholder="filter by package functions"></p>
-                            <button  class="btn btn-sm btn-block text-left" ng-repeat="t in report.topCPU" ng-click="CPUList(t.Name)" ng-show="infilter(t.Name)">{{ t.Name }} {{t.Percent}}%</button>
+                            <button  class="btn btn-sm btn-block text-left" ng-repeat="t in report.topCPU" ng-click="CPUList(t.Name)" ng-show="infilter(t.Name)">{{ t.Name }} ({{t.Percent * report.totaltime}}ms)</button>
                         </div>
                     </div>
                     <div ng-show="report.currentSample && edit.CPU">

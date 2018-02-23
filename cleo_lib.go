@@ -170,7 +170,9 @@ func TestFrame(test Test) {
 				// Could not obtain stat, handle error
 
 				if fi.Size() > 100 {
-					core.RunCmd(fmt.Sprintf("killall -3 %s-cleo", test.ID))
+					if !test.NoBuild {
+						core.RunCmd(fmt.Sprintf("killall -3 %s-cleo", test.ID))
+					}
 					test.Working = false
 					test.Finished = true
 					test.End = time.Now()
@@ -264,19 +266,24 @@ func TestFrame(test Test) {
 		UpdateTest(test)
 		SaveConfig()
 	}()
+	var shscript string
 	if !test.NoBuild {
-		shscript := fmt.Sprintf(`#!/bin/bash  
-cmd="%s"
-startServer="%s-cleo"
-eval "${startServer}" &>%s.log &disown
-sleep %v
-eval "${cmd}" >%s.test &disown
-exit 0`, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, filepath.Join(cleoWorkspace, test.ID))
-		bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.sh", test.ID))
-		ioutil.WriteFile(bspath, []byte(shscript), 0777)
-		core.RunCmdSmart(fmt.Sprintf("sh %s &>/dev/null", bspath))
+		shscript = fmt.Sprintf(BuildScript, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, filepath.Join(cleoWorkspace, test.ID))
+	} else {
+		shscript = fmt.Sprintf(LaunchScript, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, filepath.Join(cleoWorkspace, test.ID))
 	}
+	bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.sh", test.ID))
+	ioutil.WriteFile(bspath, []byte(shscript), 0777)
+	core.RunCmdSmart(fmt.Sprintf("sh %s &>/dev/null", bspath))
 
+}
+func EscapeRegexp(lookup string) string {
+	escaped := strings.Replace(lookup, "(", "\\(", -1)
+	escaped = strings.Replace(escaped, ")", "\\)", -1)
+	escaped = strings.Replace(escaped, "/", "\\/", -1)
+	escaped = strings.Replace(escaped, ".", "\\.", -1)
+	escaped = strings.Replace(escaped, "*", "\\*", -1)
+	return fmt.Sprintf("^(%s)", escaped)
 }
 
 func Load(name string, targ interface{}) error {
