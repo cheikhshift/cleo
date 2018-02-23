@@ -93,55 +93,42 @@ func AlertSys(danger bool, text string, Time time.Time) {
 func TestFrame(test Test) {
 
 	app := GetApp(test.TargetID)
-	core.RunCmd(fmt.Sprintf("killall -3 %s-cleo", test.ID))
-	pathtemp := filepath.Join(dfd, "src", app.Path)
-	pkgpath := strings.Split(pathtemp, "/")
-	pkgpath = append(pkgpath, Utilname)
 
-	if app.FetchOntest {
-		core.RunCmd(fmt.Sprintf("go get -u %s", app.Path))
-	}
-	os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s-cleo", test.ID)))
-	os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID)))
-	defer os.Remove(fmt.Sprintf("/%s", filepath.Join(pkgpath...)))
-
-	err := ioutil.WriteFile(fmt.Sprintf("/%s", filepath.Join(pkgpath...)), CleoUtil, 0700)
-	if err != nil {
-		test.Working = false
-		test.Finished = true
-		test.End = time.Now()
-		AlertSys(true, "Error during setup of application.", time.Now())
-		return
-	}
-
-	logd, err := core.RunCmdSmart(fmt.Sprintf("go build -o %s-cleo %s", filepath.Join(cleoWorkspace, test.ID), app.Path))
-
-	if err != nil {
-		test.Working = false
-		test.Finished = true
-		test.End = time.Now()
-		AlertSys(true, fmt.Sprintf("Error installing web application. Log : %s", logd), time.Now())
-		return
-	}
-
-	port := fmt.Sprintf("%v", TestCount+45000)
-	err = os.Setenv("PORT", port)
-	if app.Envs != nil {
-		for i := 0; i < len(app.Envs); i++ {
-			os.Setenv(app.Envs[i].Key, app.Envs[i].Value)
+	if !test.NoBuild {
+		core.RunCmd(fmt.Sprintf("killall -3 %s-cleo", test.ID))
+		pathtemp := filepath.Join(dfd, "src", app.Path)
+		pkgpath := strings.Split(pathtemp, "/")
+		pkgpath = append(pkgpath, Utilname)
+		if app.FetchOntest {
+			core.RunCmd(fmt.Sprintf("go get -u %s", app.Path))
 		}
-	}
-	if err != nil {
-		test.Working = false
-		test.Finished = true
-		test.End = time.Now()
-		AlertSys(true, "Error setting port", time.Now())
-		return
+		os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s-cleo", test.ID)))
+		os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID)))
+		defer os.Remove(fmt.Sprintf("/%s", filepath.Join(pkgpath...)))
+
+		err := ioutil.WriteFile(fmt.Sprintf("/%s", filepath.Join(pkgpath...)), CleoUtil, 0700)
+		if err != nil {
+			test.Working = false
+			test.Finished = true
+			test.End = time.Now()
+			AlertSys(true, "Error during setup of application.", time.Now())
+			return
+		}
+
+		logd, err := core.RunCmdSmart(fmt.Sprintf("go build -o %s-cleo %s", filepath.Join(cleoWorkspace, test.ID), app.Path))
+
+		if err != nil {
+			test.Working = false
+			test.Finished = true
+			test.End = time.Now()
+			AlertSys(true, fmt.Sprintf("Error installing web application. Log : %s", logd), time.Now())
+			return
+		}
+
 	}
 	if Mset.Settings.Connections == 0 {
 		Mset.Settings.Connections = 100
 	}
-
 	if Mset.Settings.Threads == 0 {
 		Mset.Settings.Threads = 2
 	}
@@ -150,6 +137,20 @@ func TestFrame(test Test) {
 	var addr, cmmand string
 
 	if !test.NoBuild {
+		port := fmt.Sprintf("%v", TestCount+45000)
+		err := os.Setenv("PORT", port)
+		if app.Envs != nil {
+			for i := 0; i < len(app.Envs); i++ {
+				os.Setenv(app.Envs[i].Key, app.Envs[i].Value)
+			}
+		}
+		if err != nil {
+			test.Working = false
+			test.Finished = true
+			test.End = time.Now()
+			AlertSys(true, "Error setting port", time.Now())
+			return
+		}
 		addr = fmt.Sprintf("%s:%s", HostAddress, port)
 		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
 	} else {
@@ -263,16 +264,18 @@ func TestFrame(test Test) {
 		UpdateTest(test)
 		SaveConfig()
 	}()
-	shscript := fmt.Sprintf(`#!/bin/bash  
+	if !test.NoBuild {
+		shscript := fmt.Sprintf(`#!/bin/bash  
 cmd="%s"
 startServer="%s-cleo"
 eval "${startServer}" &>%s.log &disown
 sleep %v
 eval "${cmd}" >%s.test &disown
 exit 0`, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, filepath.Join(cleoWorkspace, test.ID))
-	bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.sh", test.ID))
-	ioutil.WriteFile(bspath, []byte(shscript), 0777)
-	core.RunCmdSmart(fmt.Sprintf("sh %s &>/dev/null", bspath))
+		bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.sh", test.ID))
+		ioutil.WriteFile(bspath, []byte(shscript), 0777)
+		core.RunCmdSmart(fmt.Sprintf("sh %s &>/dev/null", bspath))
+	}
 
 }
 
