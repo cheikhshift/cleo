@@ -155,7 +155,7 @@ func TestFrame(test Test) {
 		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
 	} else {
 		addr = fmt.Sprintf("%s:%s", test.CustomAddress, test.PortNumber)
-		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s:%s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
+		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
 	}
 	go func() {
 
