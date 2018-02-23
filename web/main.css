@@ -31,6 +31,11 @@ body {
 	
 }
 
+@media (min-width: 992px)
+.modal-lg {
+    max-width: 900px;
+}
+
 .ng-dirty.ng-invalid {
   border-color:red;
 }

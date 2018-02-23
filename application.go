@@ -34,7 +34,7 @@ var TemplateFuncStore template.FuncMap
 var templateCache = gosweb.NewTemplateCache()
 
 func StoreNetfn() int {
-	TemplateFuncStore = template.FuncMap{"a": gosweb.Netadd, "s": gosweb.Netsubs, "m": gosweb.Netmultiply, "d": gosweb.Netdivided, "js": gosweb.Netimportjs, "css": gosweb.Netimportcss, "sd": gosweb.NetsessionDelete, "sr": gosweb.NetsessionRemove, "sc": gosweb.NetsessionKey, "ss": gosweb.NetsessionSet, "sso": gosweb.NetsessionSetInt, "sgo": gosweb.NetsessionGetInt, "sg": gosweb.NetsessionGet, "form": gosweb.Formval, "eq": gosweb.Equalz, "neq": gosweb.Nequalz, "lte": gosweb.Netlt, "LoadWebAsset": NetLoadWebAsset, "AddApp": NetAddApp, "AddTest": NetAddTest, "Cleo": NetCleo, "DeleteAlerts": NetDeleteAlerts, "GetList": NetGetList, "GetTop": NetGetTop, "GetCard": NetGetCard, "Start": NetStart, "Cancel": NetCancel, "Nuke": NetNuke, "UpdateApp": NetUpdateApp, "UpdateTest": NetUpdateTest, "UpdateSettings": NetUpdateSettings, "DeleteApp": NetDeleteApp, "DeleteTest": NetDeleteTest, "ang": Netang, "bang": Netbang, "cang": Netcang, "server": Netserver, "bserver": Netbserver, "cserver": Netcserver, "jquery": Netjquery, "bjquery": Netbjquery, "cjquery": Netcjquery, "App": NetstructApp, "isApp": NetcastApp, "Setting": NetstructSetting, "isSetting": NetcastSetting, "EnvVar": NetstructEnvVar, "isEnvVar": NetcastEnvVar, "Test": NetstructTest, "isTest": NetcastTest, "HeapFrame": NetstructHeapFrame, "isHeapFrame": NetcastHeapFrame, "CleoSet": NetstructCleoSet, "isCleoSet": NetcastCleoSet, "Alert": NetstructAlert, "isAlert": NetcastAlert, "TopDist": NetstructTopDist, "isTopDist": NetcastTopDist}
+	TemplateFuncStore = template.FuncMap{"a": gosweb.Netadd, "s": gosweb.Netsubs, "m": gosweb.Netmultiply, "d": gosweb.Netdivided, "js": gosweb.Netimportjs, "css": gosweb.Netimportcss, "sd": gosweb.NetsessionDelete, "sr": gosweb.NetsessionRemove, "sc": gosweb.NetsessionKey, "ss": gosweb.NetsessionSet, "sso": gosweb.NetsessionSetInt, "sgo": gosweb.NetsessionGetInt, "sg": gosweb.NetsessionGet, "form": gosweb.Formval, "eq": gosweb.Equalz, "neq": gosweb.Nequalz, "lte": gosweb.Netlt, "LoadWebAsset": NetLoadWebAsset, "AddApp": NetAddApp, "AddTest": NetAddTest, "Cleo": NetCleo, "DeleteAlerts": NetDeleteAlerts, "GetList": NetGetList, "GetListCPU": NetGetListCPU, "GetCPUtimes": NetGetCPUtimes, "GetTop": NetGetTop, "GetCPUTop": NetGetCPUTop, "GetCard": NetGetCard, "Start": NetStart, "Cancel": NetCancel, "Nuke": NetNuke, "UpdateApp": NetUpdateApp, "UpdateTest": NetUpdateTest, "UpdateSettings": NetUpdateSettings, "DeleteApp": NetDeleteApp, "DeleteTest": NetDeleteTest, "ang": Netang, "bang": Netbang, "cang": Netcang, "server": Netserver, "bserver": Netbserver, "cserver": Netcserver, "jquery": Netjquery, "bjquery": Netbjquery, "cjquery": Netcjquery, "App": NetstructApp, "isApp": NetcastApp, "Setting": NetstructSetting, "isSetting": NetcastSetting, "EnvVar": NetstructEnvVar, "isEnvVar": NetcastEnvVar, "Test": NetstructTest, "isTest": NetcastTest, "HeapFrame": NetstructHeapFrame, "isHeapFrame": NetcastHeapFrame, "CleoSet": NetstructCleoSet, "isCleoSet": NetcastCleoSet, "Alert": NetstructAlert, "isAlert": NetcastAlert, "TopDist": NetstructTopDist, "isTopDist": NetcastTopDist, "CPUFrame": NetstructCPUFrame, "isCPUFrame": NetcastCPUFrame}
 	return 0
 }
 
@@ -611,13 +611,13 @@ func NetcastEnvVar(args ...interface{}) *EnvVar {
 func NetstructEnvVar() *EnvVar { return &EnvVar{} }
 
 type Test struct {
-	ID, TargetID                string
-	Name, Data, Path, Method, H string
-	NReqs                       int
-	Finished, Working           bool
-	Duration                    float64
-	HeapMinute                  []HeapFrame
-	Start, End                  time.Time
+	ID, TargetID                               string
+	Name, Data, Path, Method, H, CustomAddress string
+	NReqs, PortNumber                          int
+	Finished, Working, NoBuild, CPU            bool
+	Duration, MaxCPU                           float64
+	HeapMinute                                 []HeapFrame
+	Start, End                                 time.Time
 }
 
 func NetcastTest(args ...interface{}) *Test {
@@ -733,6 +733,29 @@ func NetcastTopDist(args ...interface{}) *TopDist {
 }
 func NetstructTopDist() *TopDist { return &TopDist{} }
 
+type CPUFrame struct {
+	Time     time.Time
+	CPUUsage int
+}
+
+func NetcastCPUFrame(args ...interface{}) *CPUFrame {
+
+	s := CPUFrame{}
+	mapp := args[0].(db.O)
+	if _, ok := mapp["_id"]; ok {
+		mapp["Id"] = mapp["_id"]
+	}
+	data, _ := json.Marshal(&mapp)
+
+	err := json.Unmarshal(data, &s)
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	return &s
+}
+func NetstructCPUFrame() *CPUFrame { return &CPUFrame{} }
+
 //
 func NetLoadWebAsset(args ...interface{}) string {
 
@@ -807,6 +830,54 @@ func NetGetList(test Test, lookup string) (list string) {
 }
 
 //
+func NetGetListCPU(test Test, lookup string) (list string) {
+
+	if strings.Contains(lookup, "*") {
+		parts := strings.Split(lookup, ".")
+		lookup = fmt.Sprintf("%s()", parts[len(parts)-1])
+	}
+	for cnt, _ := range test.HeapMinute {
+		cmd := fmt.Sprintf("go tool pprof --list=%s %s", lookup, filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("p%v", cnt))))
+		logfull, _ := core.RunCmdSmart(cmd)
+
+		retset := strings.Split(logfull, "\n")
+
+		if len(retset) > 2 {
+			list = logfull
+			break
+		}
+	}
+
+	return
+
+}
+
+//
+func NetGetCPUtimes(test Test) (top []CPUFrame) {
+
+	for cnt, frame := range test.HeapMinute {
+		var timeused int
+		logfull, _ := core.RunCmdSmart(fmt.Sprintf("go tool pprof -top %s", filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("p%v", cnt)))))
+		retset := strings.Split(logfull, "\n")
+		totalTime := strings.Split(retset[2], "=")
+		timeString := "0"
+
+		if strings.Contains(totalTime[1], "s") {
+			timeStringArray := strings.Split(totalTime[1], "s")
+			timeString = strings.TrimSpace(timeStringArray[0])
+		}
+		f, _ := strconv.ParseFloat(timeString, 64)
+		f *= 1000
+		timeused = int(f)
+		cpuSample := CPUFrame{CPUUsage: timeused, Time: frame.Time}
+		top = append(top, cpuSample)
+	}
+
+	return
+
+}
+
+//
 func NetGetTop(test Test) (top []TopDist) {
 
 	valm := make(map[string]float64)
@@ -851,6 +922,63 @@ func NetGetTop(test Test) (top []TopDist) {
 
 	tperc = 100.0 - tperc
 	top = append(top, TopDist{Name: "Other samples", Percent: tperc})
+	valm = nil
+
+	return
+
+}
+
+//
+func NetGetCPUTop(test Test) (top []TopDist, total float64) {
+
+	valm := make(map[string]float64)
+
+	for cnt, _ := range test.HeapMinute {
+		logfull, _ := core.RunCmdSmart(fmt.Sprintf("go tool pprof -top %s", filepath.Join(cleoWorkspace, Path("tests", test.ID, fmt.Sprintf("p%v", cnt)))))
+		retset := strings.Split(logfull, "\n")
+		if !strings.Contains(logfull, "Dropped") {
+			retset = retset[5:]
+		} else {
+			retset = retset[6:]
+		}
+
+		for _, str := range retset {
+			strfm := strings.Replace(strings.TrimSpace(str), "   ", " ", -1)
+			strfm = strings.Replace(strfm, "  ", " ", -1)
+			var strval string
+			subset := strings.Split(strfm, " ")
+			for indx, _ := range subset {
+				if strings.Contains(subset[indx], "ms") {
+					strval = subset[indx]
+				}
+			}
+			if len(subset) > 5 {
+
+				subsettwo := strings.Split(subset[len(subset)-1], "   ")
+				subsettwo = append([]string{subset[len(subset)-2]}, subsettwo...)
+				//fmt.Println(subsettwo)
+				_, exts := valm[subsettwo[0]]
+				if !exts {
+					valm[subsettwo[0]] = 0
+				}
+				f, _ := strconv.ParseFloat(strings.Replace(strval, "ms", "", -1), 64)
+
+				valm[subsettwo[0]] += f
+				total += f
+			}
+		}
+	}
+
+	tperc := 0.0
+	for key, val := range valm {
+		perc := (val / total)
+		top = append(top, TopDist{Name: key, Percent: perc})
+		tperc += perc
+	}
+
+	tperc = 100.0 - tperc
+	top = append(top, TopDist{Name: "Other samples", Percent: tperc})
+	top = top[:CPUTOPSamples]
 	valm = nil
 
 	return
@@ -1424,11 +1552,30 @@ function GetList(Test,Lookup , cb){
 	t.Lookup = Lookup
 	jsrequestmomentum("/momentum/funcs?name=GetList", t, "POSTJSON", cb)
 }
+function GetListCPU(Test,Lookup , cb){
+	var t = {}
+	
+	t.Test = Test
+	t.Lookup = Lookup
+	jsrequestmomentum("/momentum/funcs?name=GetListCPU", t, "POSTJSON", cb)
+}
+function GetCPUtimes(Test , cb){
+	var t = {}
+	
+	t.Test = Test
+	jsrequestmomentum("/momentum/funcs?name=GetCPUtimes", t, "POSTJSON", cb)
+}
 function GetTop(Test , cb){
 	var t = {}
 	
 	t.Test = Test
 	jsrequestmomentum("/momentum/funcs?name=GetTop", t, "POSTJSON", cb)
+}
+function GetCPUTop(Test , cb){
+	var t = {}
+	
+	t.Test = Test
+	jsrequestmomentum("/momentum/funcs?name=GetCPUTop", t, "POSTJSON", cb)
 }
 function GetCard(Test , cb){
 	var t = {}
@@ -1580,6 +1727,43 @@ function DeleteTest(Test , cb){
 
 			resp["list"] = resplist0
 			w.Write([]byte(mResponse(resp)))
+		} else if r.FormValue("name") == "GetListCPU" {
+			w.Header().Set("Content-Type", "application/json")
+			type PayloadGetListCPU struct {
+				Test   Test
+				Lookup string
+			}
+			decoder := json.NewDecoder(r.Body)
+			var tmvv PayloadGetListCPU
+			err := decoder.Decode(&tmvv)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(fmt.Sprintf("{\"error\":\"%s\"}", err.Error())))
+				return
+			}
+			resp := db.O{}
+			resplist0 := NetGetListCPU(tmvv.Test, tmvv.Lookup)
+
+			resp["list"] = resplist0
+			w.Write([]byte(mResponse(resp)))
+		} else if r.FormValue("name") == "GetCPUtimes" {
+			w.Header().Set("Content-Type", "application/json")
+			type PayloadGetCPUtimes struct {
+				Test Test
+			}
+			decoder := json.NewDecoder(r.Body)
+			var tmvv PayloadGetCPUtimes
+			err := decoder.Decode(&tmvv)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(fmt.Sprintf("{\"error\":\"%s\"}", err.Error())))
+				return
+			}
+			resp := db.O{}
+			resptop0 := NetGetCPUtimes(tmvv.Test)
+
+			resp["top"] = resptop0
+			w.Write([]byte(mResponse(resp)))
 		} else if r.FormValue("name") == "GetTop" {
 			w.Header().Set("Content-Type", "application/json")
 			type PayloadGetTop struct {
@@ -1597,6 +1781,25 @@ function DeleteTest(Test , cb){
 			resptop0 := NetGetTop(tmvv.Test)
 
 			resp["top"] = resptop0
+			w.Write([]byte(mResponse(resp)))
+		} else if r.FormValue("name") == "GetCPUTop" {
+			w.Header().Set("Content-Type", "application/json")
+			type PayloadGetCPUTop struct {
+				Test Test
+			}
+			decoder := json.NewDecoder(r.Body)
+			var tmvv PayloadGetCPUTop
+			err := decoder.Decode(&tmvv)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(fmt.Sprintf("{\"error\":\"%s\"}", err.Error())))
+				return
+			}
+			resp := db.O{}
+			resptop0, resptotal1 := NetGetCPUTop(tmvv.Test)
+
+			resp["top"] = resptop0
+			resp["total"] = resptotal1
 			w.Write([]byte(mResponse(resp)))
 		} else if r.FormValue("name") == "GetCard" {
 			w.Header().Set("Content-Type", "application/json")

@@ -147,9 +147,15 @@ func TestFrame(test Test) {
 	}
 
 	TestCount++
-	addr := fmt.Sprintf("http://127.0.0.1:%s", port)
-	cmmand := fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v http://127.0.0.1:%s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, port, test.Path)
+	var addr, cmmand string
 
+	if !test.NoBuild {
+		addr = fmt.Sprintf("%s:%s", HostAddress, port)
+		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
+	} else {
+		addr = fmt.Sprintf("%s:%s", test.CustomAddress, test.PortNumber)
+		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s:%s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
+	}
 	go func() {
 
 		HeapCount := 0
