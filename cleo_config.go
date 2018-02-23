@@ -9,4 +9,6 @@ var dfd string = os.ExpandEnv("$GOPATH")
 
 var cleoWorkspace string = "cleo_workspace"
 
+var serverWaitTime int = 20
+
 var configPath string
