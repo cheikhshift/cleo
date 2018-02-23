@@ -3,7 +3,7 @@ A web application used to analyze other web applications written in Go. It gener
 
 ### Updates :
 - Inspect CPU times.
-- Test applications built and deployed at external locations.
+- Test applications built and deployed at external locations. This application must have `pprof` handlers available.
 
 ## Requirements
 1. Go lang
