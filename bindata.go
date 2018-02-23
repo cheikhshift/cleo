@@ -260,7 +260,7 @@ func webMomentumTestTmpl() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "web/momentum/test.tmpl", size: 22, mode: os.FileMode(420), modTime: time.Unix(1519405212, 0)}
+	info := bindataFileInfo{name: "web/momentum/test.tmpl", size: 22, mode: os.FileMode(420), modTime: time.Unix(1519406828, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -280,7 +280,7 @@ func webMomentumYour404PageTmpl() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "web/momentum/your-404-page.tmpl", size: 535, mode: os.FileMode(420), modTime: time.Unix(1519405212, 0)}
+	info := bindataFileInfo{name: "web/momentum/your-404-page.tmpl", size: 535, mode: os.FileMode(420), modTime: time.Unix(1519406828, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -300,7 +300,7 @@ func webMomentumYour500PageTmpl() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "web/momentum/your-500-page.tmpl", size: 535, mode: os.FileMode(420), modTime: time.Unix(1519405212, 0)}
+	info := bindataFileInfo{name: "web/momentum/your-500-page.tmpl", size: 535, mode: os.FileMode(420), modTime: time.Unix(1519406828, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -400,7 +400,7 @@ func tmplMomentumAngTmpl() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "tmpl/momentum/ang.tmpl", size: 2102, mode: os.FileMode(420), modTime: time.Unix(1519405212, 0)}
+	info := bindataFileInfo{name: "tmpl/momentum/ang.tmpl", size: 2102, mode: os.FileMode(420), modTime: time.Unix(1519406828, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -420,7 +420,7 @@ func tmplMomentumJqueryTmpl() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "tmpl/momentum/jquery.tmpl", size: 161, mode: os.FileMode(420), modTime: time.Unix(1519405212, 0)}
+	info := bindataFileInfo{name: "tmpl/momentum/jquery.tmpl", size: 161, mode: os.FileMode(420), modTime: time.Unix(1519406828, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -440,7 +440,7 @@ func tmplMomentumServerTmpl() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "tmpl/momentum/server.tmpl", size: 1175, mode: os.FileMode(420), modTime: time.Unix(1519405212, 0)}
+	info := bindataFileInfo{name: "tmpl/momentum/server.tmpl", size: 1175, mode: os.FileMode(420), modTime: time.Unix(1519406828, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

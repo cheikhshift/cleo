@@ -833,6 +833,8 @@ func NetGetListCPU(test Test, lookup string) (list string) {
 
 	if strings.Contains(lookup, "*") {
 		lookup = EscapeRegexp(lookup)
+	} else if strings.Contains(lookup, "/") {
+		lookup = fmt.Sprintf("\"%s\"", lookup)
 	}
 
 	for cnt, _ := range test.HeapMinute {
@@ -951,18 +953,17 @@ func NetGetCPUTop(test Test) (top []TopDist, total float64) {
 					strval = subset[indx]
 				}
 			}
+
 			if len(subset) > 5 {
 
-				subsettwo := strings.Split(subset[len(subset)-1], "   ")
-				subsettwo = append([]string{subset[len(subset)-2]}, subsettwo...)
 				//fmt.Println(subsettwo)
-				_, exts := valm[subsettwo[0]]
+				_, exts := valm[subset[len(subset)-2]]
 				if !exts {
-					valm[subsettwo[0]] = 0
+					valm[subset[len(subset)-2]] = 0
 				}
 				f, _ := strconv.ParseFloat(strings.Replace(strval, "ms", "", -1), 64)
 
-				valm[subsettwo[0]] += f
+				valm[subset[len(subset)-2]] += f
 				total += f
 			}
 		}
