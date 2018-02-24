@@ -22,7 +22,7 @@ Run the following command to launch application :
 		$ cleo
 
 ## Go project setup
-You Go web application should retrieve the port number to listen on from env. variable $PORT.
+Your Go web application should retrieve the port number to listen on from env. variable $PORT.
 
 Example
 	
