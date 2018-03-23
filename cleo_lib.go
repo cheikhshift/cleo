@@ -86,8 +86,9 @@ func Path(module, id, name string) string {
 	return pathoffile
 }
 
-func AlertSys(danger bool, text string, Time time.Time) {
+func AlertSys(danger bool, text string, Time time.Time,test Test) {
 	Mset.Alerts = append(Mset.Alerts, Alert{danger, text, Time})
+	UpdateTest(test)
 	SaveConfig()
 }
 
@@ -121,7 +122,7 @@ func TestFrame(test Test) {
 		if !isWindows {
 			pathToUtil = fmt.Sprintf("/%s", filepath.Join(pkgpath...))
 		} else {
-			pathToUtil = fmt.Sprintf("\\%s", filepath.Join(pkgpath...))
+			pathToUtil = fmt.Sprintf("%s", filepath.Join(pkgpath...))
 		}
 
 		defer os.Remove(pathToUtil)
@@ -131,17 +132,22 @@ func TestFrame(test Test) {
 			test.Working = false
 			test.Finished = true
 			test.End = time.Now()
-			AlertSys(true, "Error during setup of application.", time.Now())
+
+			AlertSys(true, "Error during setup of application.", time.Now(), test)
 			return
 		}
 
-		logd, err := core.RunCmdSmart(fmt.Sprintf("go build -o %s-cleo %s", filepath.Join(cleoWorkspace, test.ID), app.Path))
+		var dotExe string
+		if isWindows {
+			dotExe = ".exe"
+		} 
+		logd, err := core.RunCmdSmart(fmt.Sprintf("go build -o %s-cleo%s %s", filepath.Join(cleoWorkspace, test.ID), dotExe ,app.Path))
 
 		if err != nil {
 			test.Working = false
 			test.Finished = true
 			test.End = time.Now()
-			AlertSys(true, fmt.Sprintf("Error installing web application. Log : %s", logd), time.Now())
+			AlertSys(true, fmt.Sprintf("Error installing web application. Log : %s", logd), time.Now(),test)
 			return
 		}
 
@@ -168,7 +174,7 @@ func TestFrame(test Test) {
 			test.Working = false
 			test.Finished = true
 			test.End = time.Now()
-			AlertSys(true, "Error setting port", time.Now())
+			AlertSys(true, "Error setting port", time.Now(),test)
 			return
 		}
 		addr = fmt.Sprintf("%s:%s", HostAddress, port)
@@ -201,7 +207,7 @@ func TestFrame(test Test) {
 					test.End = time.Now()
 					TestCount--
 					HeapCount--
-					AlertSys(false, fmt.Sprintf("Test %s complete.", test.Name), time.Now())
+					AlertSys(false, fmt.Sprintf("Test %s complete.", test.Name), time.Now(),test)
 					break
 				} else {
 
@@ -217,7 +223,7 @@ func TestFrame(test Test) {
 						if err != nil {
 							test.Working = false
 							test.Finished = true
-							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now())
+							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now(),test)
 							break
 						}
 
@@ -229,7 +235,7 @@ func TestFrame(test Test) {
 						if err != nil {
 							test.Working = false
 							test.Finished = true
-							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now())
+							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now(),test)
 							break
 						}
 
@@ -239,7 +245,7 @@ func TestFrame(test Test) {
 						if err != nil {
 							test.Working = false
 							test.Finished = true
-							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now())
+							AlertSys(true, fmt.Sprintf("%s Error: %s", test.Name, err.Error()), time.Now(),test)
 							break
 						}
 						//}
