@@ -23,7 +23,7 @@
   name = "github.com/cheikhshift/gos"
   packages = ["core","web"]
   revision = "1ef1e8e6c1692f9e8ee8d5eb93c9038f0c567504"
-  version = "v0.5.11"
+  version = "v0.5.14"
 
 [[projects]]
   branch = "master"
