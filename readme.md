@@ -8,8 +8,7 @@ A web application used to analyze other web applications written in Go. It gener
 ## Requirements
 1. Go lang
 2. go-work : install with `go get github.com/adjust/go-wrk`
-3. $GOPATH set. Guide [here](https://learn-golang.com/en/getting-started/)
-4. Unix/Linux OS.
+3. $GOPATH set. Guide [here](https://learn-golang.com/en/getting-started/). On windows install `go` with Choco to skip this step.
 
 ## Install
 Install with :
