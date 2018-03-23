@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/cheikhshift/db"
 	"github.com/cheikhshift/gos/core"
@@ -19,7 +18,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -159,28 +157,7 @@ func apiAttempt(w http.ResponseWriter, r *http.Request) (callmet bool) {
 	session = nil
 	return
 }
-func SetField(obj interface{}, name string, value interface{}) error {
-	structValue := reflect.ValueOf(obj).Elem()
-	structFieldValue := structValue.FieldByName(name)
 
-	if !structFieldValue.IsValid() {
-		return fmt.Errorf("No such field: %s in obj", name)
-	}
-
-	if !structFieldValue.CanSet() {
-		return fmt.Errorf("Cannot set %s field value", name)
-	}
-
-	structFieldType := structFieldValue.Type()
-	val := reflect.ValueOf(value)
-	if structFieldType != val.Type() {
-		invalidTypeError := errors.New("Provided value type didn't match obj field type")
-		return invalidTypeError
-	}
-
-	structFieldValue.Set(val)
-	return nil
-}
 func DebugTemplate(w http.ResponseWriter, r *http.Request, tmpl string) {
 	lastline := 0
 	linestring := ""
@@ -1447,7 +1424,13 @@ func main() {
 	//psss go code here : func main()
 	Windows := strings.Contains(runtime.GOOS, "windows")
 	if Windows {
-		os.Chdir(os.ExpandEnv("$USERPROFILE"))
+		userhome := os.ExpandEnv("$USERPROFILE")
+		os.Chdir(userhome)
+		if dfd == "" {
+			NewGoPath := fmt.Sprintf("%s\\go", userhome)
+			os.Setenv("$GOPATH", NewGoPath)
+			dfd = NewGoPath
+		}
 	} else {
 		os.Chdir(os.ExpandEnv("$HOME"))
 	}

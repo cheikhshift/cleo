@@ -3,6 +3,8 @@ package main
 import "os"
 import "time"
 import "net/http"
+import "strings"
+import "runtime"
 
 // Timeout of web client request
 // Used when fetching heap information
@@ -31,6 +33,19 @@ sleep %v
 eval "${cmd}" >%s.test &disown
 exit 0`
 
+// Batch script used to start
+// and test local go web server.
+const BatchBuildScript string = `START "" %s-cleo 1>%s.log 2>1&
+SLEEP %v
+START "" %s 1>%s.test 2>1&
+EXIT 0
+`
+
+// Batch script used to launch
+// test to external go web server.
+const BatchLaunchScript = `START "" %s 1>%s.test 2>1&
+EXIT 0`
+
 // Bash script used to launch
 // test to external go web server.
 const LaunchScript = `#!/bin/bash  
@@ -45,6 +60,8 @@ const HostAddress = "http://127.0.0.1"
 var Key []byte = []byte("a very very very very secret key")
 
 // abbreviation of DeFault Directory.
+// Update with the path to your go src.
+// If $GOPATH is set leave as is.
 var dfd string = os.ExpandEnv("$GOPATH")
 
 var cleoWorkspace string = "cleo_workspace"
@@ -72,3 +89,5 @@ var tr *http.Transport = &http.Transport{
 	ResponseHeaderTimeout: dft,
 	ExpectContinueTimeout: dft,
 }
+
+var isWindows bool = strings.Contains(runtime.GOOS, "indows")

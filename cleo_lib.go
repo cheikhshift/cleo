@@ -6,6 +6,7 @@ import (
 	"github.com/cheikhshift/form"
 	"github.com/cheikhshift/gos/core"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -92,10 +93,20 @@ func AlertSys(danger bool, text string, Time time.Time) {
 
 func TestFrame(test Test) {
 
+	var killCommand string
 	app := GetApp(test.TargetID)
 
 	if !test.NoBuild {
-		core.RunCmd(fmt.Sprintf("killall -3 %s-cleo", test.ID))
+		// attempt to
+		log.Println("Attempting to kill any previous processes.")
+
+		if !isWindows {
+			killCommand = fmt.Sprintf("killall -3 %s-cleo", test.ID)
+		} else {
+			killCommand = fmt.Sprintf("taskkill /f /im %s-cleo.exe", test.ID)
+		}
+		core.RunCmd(killCommand)
+
 		pathtemp := filepath.Join(dfd, "src", app.Path)
 		pkgpath := strings.Split(pathtemp, "/")
 		pkgpath = append(pkgpath, Utilname)
@@ -104,9 +115,18 @@ func TestFrame(test Test) {
 		}
 		os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s-cleo", test.ID)))
 		os.Remove(filepath.Join(cleoWorkspace, fmt.Sprintf("%s.test", test.ID)))
-		defer os.Remove(fmt.Sprintf("/%s", filepath.Join(pkgpath...)))
 
-		err := ioutil.WriteFile(fmt.Sprintf("/%s", filepath.Join(pkgpath...)), CleoUtil, 0700)
+		var pathToUtil string
+
+		if !isWindows {
+			pathToUtil = fmt.Sprintf("/%s", filepath.Join(pkgpath...))
+		} else {
+			pathToUtil = fmt.Sprintf("\\%s", filepath.Join(pkgpath...))
+		}
+
+		defer os.Remove(pathToUtil)
+
+		err := ioutil.WriteFile(pathToUtil, CleoUtil, 0700)
 		if err != nil {
 			test.Working = false
 			test.Finished = true
@@ -155,8 +175,9 @@ func TestFrame(test Test) {
 		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
 	} else {
 		addr = fmt.Sprintf("%s:%s", test.CustomAddress, test.PortNumber)
-		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
+		cmmand = fmt.Sprintf(`go-wrk -c=%v -m="%s" -b="%s" -n=%v -H="%s" -t=%v %s:%s%s`, Mset.Settings.Connections, test.Method, test.Data, test.NReqs, test.H, Mset.Settings.Threads, addr, test.Path)
 	}
+
 	go func() {
 
 		HeapCount := 0
@@ -170,12 +191,15 @@ func TestFrame(test Test) {
 				// Could not obtain stat, handle error
 
 				if fi.Size() > 100 {
+
 					if !test.NoBuild {
-						core.RunCmd(fmt.Sprintf("killall -3 %s-cleo", test.ID))
+						core.RunCmd(killCommand)
 					}
+
 					test.Working = false
 					test.Finished = true
 					test.End = time.Now()
+					TestCount--
 					HeapCount--
 					AlertSys(false, fmt.Sprintf("Test %s complete.", test.Name), time.Now())
 					break
@@ -266,15 +290,8 @@ func TestFrame(test Test) {
 		UpdateTest(test)
 		SaveConfig()
 	}()
-	var shscript string
-	if !test.NoBuild {
-		shscript = fmt.Sprintf(BuildScript, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, filepath.Join(cleoWorkspace, test.ID))
-	} else {
-		shscript = fmt.Sprintf(LaunchScript, cmmand, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, filepath.Join(cleoWorkspace, test.ID))
-	}
-	bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.sh", test.ID))
-	ioutil.WriteFile(bspath, []byte(shscript), 0777)
-	core.RunCmdSmart(fmt.Sprintf("sh %s &>/dev/null", bspath))
+
+	LaunchApp(cmmand, test, app)
 
 }
 func EscapeRegexp(lookup string) string {
