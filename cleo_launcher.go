@@ -28,7 +28,7 @@ func LaunchApp(cmmand string, test Test, app App) {
 		}
 		bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.bat", test.ID))
 		ioutil.WriteFile(bspath, []byte(shscript), 0777)
-		
-		core.RunCmdSmart(fmt.Sprintf("%s", bspath))
+
+		core.RunCmdSmart(fmt.Sprintf("cmd /C %s", bspath))
 	}
 }

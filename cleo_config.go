@@ -35,11 +35,11 @@ exit 0`
 
 // Batch script used to start
 // and test local go web server.
-const BatchBuildScript string = "START \"\" %s-cleo 1>%s.log\nTIMEOUT %v\nSTART \"\" %s\\%s 1>%s.test"
+const BatchBuildScript string = "START \"\" %s-cleo 1>%s.log\nTIMEOUT %v\n%s\\%s 1>%s.test"
 
 // Batch script used to launch
 // test to external go web server.
-const BatchLaunchScript = "START \"\" %s\\%s 1>%s.test"
+const BatchLaunchScript = "%s\\%s 1>%s.test"
 
 // Bash script used to launch
 // test to external go web server.
