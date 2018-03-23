@@ -37,13 +37,13 @@ exit 0`
 // and test local go web server.
 const BatchBuildScript string = `START "" %s-cleo 1>%s.log 2>1&
 SLEEP %v
-START "" %s 1>%s.test 2>1&
+START "" %s\%s 1>%s.test 2>1&
 EXIT 0
 `
 
 // Batch script used to launch
 // test to external go web server.
-const BatchLaunchScript = `START "" %s 1>%s.test 2>1&
+const BatchLaunchScript = `START "" %s\%s 1>%s.test 2>1&
 EXIT 0`
 
 // Bash script used to launch

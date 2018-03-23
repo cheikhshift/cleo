@@ -22,9 +22,9 @@ func LaunchApp(cmmand string, test Test, app App) {
 	} else {
 
 		if !test.NoBuild {
-			shscript = fmt.Sprintf(BatchBuildScript, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime, cmmand, filepath.Join(cleoWorkspace, test.ID))
+			shscript = fmt.Sprintf(BatchBuildScript, filepath.Join(cleoWorkspace, test.ID), filepath.Join(cleoWorkspace, app.ID), serverWaitTime,filepath.Join(dfd, "bin") ,cmmand, filepath.Join(cleoWorkspace, test.ID))
 		} else {
-			shscript = fmt.Sprintf(BatchLaunchScript, cmmand, filepath.Join(cleoWorkspace, test.ID))
+			shscript = fmt.Sprintf(BatchLaunchScript, filepath.Join(dfd, "bin"),cmmand, filepath.Join(cleoWorkspace, test.ID))
 		}
 		bspath := filepath.Join(cleoWorkspace, fmt.Sprintf("%s.bat", test.ID))
 		ioutil.WriteFile(bspath, []byte(shscript), 0777)
