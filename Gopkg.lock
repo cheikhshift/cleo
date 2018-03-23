@@ -22,7 +22,7 @@
 [[projects]]
   name = "github.com/cheikhshift/gos"
   packages = ["core","web"]
-  revision = "1ef1e8e6c1692f9e8ee8d5eb93c9038f0c567504"
+  revision = "f0806756576922ed7184b7c62b971d9623d14aa3"
   version = "v0.5.14"
 
 [[projects]]
