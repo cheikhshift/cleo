@@ -31,7 +31,7 @@
 
 [[constraint]]
   name = "github.com/cheikhshift/gos"
-  version = "0.5.11"
+  version = "0.5.14"
 
 [[constraint]]
   branch = "master"
